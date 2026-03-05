@@ -137,14 +137,18 @@ export default async () => {
 
     // TEST: on envoie seulement la 1ère partie à chaque serveur
     const results = [];
-    for (let w = 0; w < webhookUrls.length; w++) {
-      const wh = webhookUrls[w];
-      const roleId = roleIds[w] || "";
-      const mention = roleId ? `<@&${roleId}>\n` : "";
-      const prefix = parts.length > 1 ? `*(part 1/${parts.length})*\n` : "";
-      const r = await postWebhook(wh, mention + prefix + (parts[0] ?? "✅ test"), roleId);
-      results.push({ idx: w, roleId: roleId || null, ...r });
-    }
+for (let w = 0; w < webhookUrls.length; w++) {
+  const wh = webhookUrls[w];
+  const roleId = roleIds[w] || "";
+
+  for (let i = 0; i < parts.length; i++) {
+    const mention = i === 0 && roleId ? `<@&${roleId}>\n` : "";
+    const prefix = parts.length > 1 ? `*(part ${i + 1}/${parts.length})*\n` : "";
+    const payload = mention + prefix + parts[i];
+
+    await postWebhook(wh, payload, roleId);
+  }
+}
 
     return new Response(
       JSON.stringify(
