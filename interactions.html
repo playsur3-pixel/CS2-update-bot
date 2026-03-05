@@ -1,0 +1,136 @@
+<!doctype html>
+<html lang="fr">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width,initial-scale=1" />
+  <title>CS2 Update — Interactions Endpoint</title>
+  <style>
+    body { font-family: system-ui, Segoe UI, Roboto, Arial; margin: 40px; max-width: 900px; line-height: 1.6; }
+    code, pre { font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, "Liberation Mono", monospace; }
+    .card { border: 1px solid #ddd; border-radius: 12px; padding: 16px; margin: 16px 0; }
+    .row { display: flex; gap: 10px; flex-wrap: wrap; align-items: center; }
+    input { padding: 10px; border-radius: 10px; border: 1px solid #ccc; min-width: 380px; }
+    button { padding: 10px 12px; border-radius: 10px; border: 1px solid #ccc; background: #f6f6f6; cursor: pointer; }
+    button:hover { background: #eee; }
+    .ok { color: #16a34a; font-weight: 700; }
+    .bad { color: #dc2626; font-weight: 700; }
+    pre { background: #0b1220; color: #e8eefc; padding: 14px; border-radius: 12px; overflow: auto; }
+    .muted { color: #666; }
+  </style>
+</head>
+<body>
+  <h1>Interactions Endpoint (Discord) — Page de test</h1>
+
+  <p class="muted">
+    ⚠️ Cette page <b>n’est pas</b> l’endpoint “Interactions” pour Discord.
+    Discord exige une URL serveur qui reçoit des <b>POST</b> et vérifie la <b>signature</b>.
+    Sur Netlify, ça se fait via une <b>Function</b>.
+  </p>
+
+  <div class="card">
+    <h2>URL à mettre dans Discord</h2>
+    <p>
+      Dans le Developer Portal, le champ <b>URL du point de terminaison des interactions</b> doit viser ton endpoint serveur, par exemple :
+    </p>
+    <pre id="discordUrl"></pre>
+    <p class="muted">
+      Exemple Netlify Function : <code>https://TON-SITE.netlify.app/.netlify/functions/interactions</code><br/>
+      (ou si tu as un redirect : <code>https://TON-SITE.netlify.app/api/interactions</code> → function)
+    </p>
+  </div>
+
+  <div class="card">
+    <h2>Tester l’endpoint (diagnostic)</h2>
+    <div class="row">
+      <label for="endpoint"><b>Endpoint à tester :</b></label>
+      <input id="endpoint" placeholder="https://ton-site.netlify.app/.netlify/functions/interactions" />
+      <button id="btnTest">Tester</button>
+    </div>
+
+    <p id="status" class="muted">En attente…</p>
+    <pre id="result">{}</pre>
+
+    <p class="muted">
+      Note : Discord enverra des headers <code>x-signature-ed25519</code> et <code>x-signature-timestamp</code>.
+      Un test navigateur ne peut pas reproduire la signature officielle, donc ce test sert surtout à vérifier que l’URL répond
+      (HTTP/JSON) et que ton déploiement est OK.
+    </p>
+  </div>
+
+  <div class="card">
+    <h2>Rappel : pourquoi un HTML ne suffit pas ?</h2>
+    <ul>
+      <li>Discord appelle ton endpoint depuis ses serveurs (pas depuis ton navigateur).</li>
+      <li>Il faut vérifier la signature Ed25519 → ça doit être fait côté serveur (Function).</li>
+      <li>Une page HTML ne peut pas “recevoir” les POST Discord comme un serveur.</li>
+    </ul>
+  </div>
+
+  <script>
+    const $ = (id) => document.getElementById(id);
+
+    function defaultEndpointFromLocation() {
+      const origin = window.location.origin;
+      // Default Netlify Function endpoint
+      return origin + "/.netlify/functions/interactions";
+    }
+
+    function setStatus(text, ok = null) {
+      const el = $("status");
+      el.textContent = text;
+      el.classList.remove("ok", "bad");
+      if (ok === true) el.classList.add("ok");
+      if (ok === false) el.classList.add("bad");
+    }
+
+    async function testEndpoint() {
+      const endpoint = $("endpoint").value.trim();
+      if (!endpoint) {
+        setStatus("❌ URL manquante.", false);
+        return;
+      }
+
+      setStatus("⏳ Test en cours…");
+      $("result").textContent = "{}";
+
+      try {
+        // On fait un POST "fake" (sans signature), uniquement pour voir si l'URL répond.
+        const res = await fetch(endpoint, {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ type: 1 }) // ressemble à un PING, mais sans signature
+        });
+
+        const text = await res.text();
+        let body;
+        try { body = JSON.parse(text); } catch { body = text; }
+
+        $("result").textContent = JSON.stringify({
+          status: res.status,
+          ok: res.ok,
+          headers: Object.fromEntries(res.headers.entries()),
+          body
+        }, null, 2);
+
+        if (res.status === 401) {
+          setStatus("✅ Endpoint joignable. 401 attendu (signature manquante) → c’est normal pour un test navigateur.", true);
+        } else if (res.ok) {
+          setStatus("✅ Endpoint répond en 2xx. (Attention : Discord exigera quand même la vérif de signature.)", true);
+        } else {
+          setStatus("⚠️ Endpoint répond mais avec une erreur HTTP. Vérifie le déploiement/logs.", false);
+        }
+      } catch (e) {
+        setStatus("❌ Impossible de joindre l’endpoint (URL incorrecte ou CORS/problème réseau).", false);
+        $("result").textContent = JSON.stringify({ error: String(e) }, null, 2);
+      }
+    }
+
+    // init
+    const def = defaultEndpointFromLocation();
+    $("endpoint").value = def;
+    $("discordUrl").textContent = def;
+
+    $("btnTest").addEventListener("click", testEndpoint);
+  </script>
+</body>
+</html>
