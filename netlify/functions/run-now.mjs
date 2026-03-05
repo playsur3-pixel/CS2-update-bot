@@ -41,9 +41,6 @@ export default async () => {
   const latest = await fetchLatestSteamNews(appId);
   if (!latest?.gid) return new Response("ok", { status: 200 });
 
-  // Force post even if same gid? -> tu choisis :
-  // const lastGid = await store.get("lastGid");
-  // if (lastGid === latest.gid) return { statusCode: 200, body: "already posted" };
 
   const title = latest.title ?? "Counter-Strike 2 Update";
   const url = latest.url ?? "";
@@ -59,5 +56,5 @@ export default async () => {
   }
 
   await store.set("lastGid", latest.gid);
-  return { statusCode: 200, body: "posted" };
+  return new Response("ok", { status: 200 });
 };
