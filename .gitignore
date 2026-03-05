@@ -2,7 +2,7 @@
 .env
 .env.*
 !.env.example
-
+#test
 # Node (si tu ajoutes plus tard)
 node_modules/
 npm-debug.log*
