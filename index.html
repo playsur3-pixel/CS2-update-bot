@@ -1,135 +1,456 @@
-<script>
-/**
- * CONFIG: adapte uniquement les IDs ici (je ne touche pas à ton HTML).
- */
-const els = {
-  baseUrl: document.getElementById("baseUrl"), // input: https://ton-site.netlify.app
-  interactions: document.getElementById("interactionsUrl"), // input URL du point de terminaison
-  roleVerify: document.getElementById("roleVerifyUrl"), // input URL de vérification des rôles liés
-  terms: document.getElementById("termsUrl"), // input URL des Conditions d'Utilisation
-  privacy: document.getElementById("privacyUrl"), // input URL Politique de Confidentialité
+<!doctype html>
+<html lang="fr">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width,initial-scale=1" />
+  <title>Discord App URLs Generator</title>
+  <style>
+    :root {
+      --bg: #0b1220;
+      --card: #101a30;
+      --text: #e8eefc;
+      --muted: #9fb0d0;
+      --border: rgba(255,255,255,.12);
+      --ok: #22c55e;
+      --bad: #ef4444;
+      --btn: #1d2b52;
+      --btn2: #18254a;
+      --shadow: 0 10px 40px rgba(0,0,0,.35);
+    }
+    * { box-sizing: border-box; }
+    body {
+      margin: 0;
+      font-family: ui-sans-serif, system-ui, -apple-system, Segoe UI, Roboto, Arial;
+      background: radial-gradient(1200px 600px at 20% 0%, rgba(255,115,0,.22), transparent 55%),
+                  radial-gradient(900px 500px at 90% 15%, rgba(34,197,94,.18), transparent 55%),
+                  var(--bg);
+      color: var(--text);
+      padding: 28px;
+    }
+    .wrap {
+      max-width: 980px;
+      margin: 0 auto;
+      display: grid;
+      gap: 16px;
+    }
+    .header {
+      display: flex;
+      align-items: flex-start;
+      justify-content: space-between;
+      gap: 14px;
+    }
+    h1 {
+      margin: 0;
+      font-size: 22px;
+      letter-spacing: .3px;
+    }
+    p {
+      margin: 6px 0 0;
+      color: var(--muted);
+      line-height: 1.45;
+      max-width: 66ch;
+    }
+    .card {
+      background: linear-gradient(180deg, rgba(255,255,255,.03), rgba(255,255,255,.01));
+      border: 1px solid var(--border);
+      border-radius: 16px;
+      box-shadow: var(--shadow);
+      padding: 18px;
+    }
+    .grid {
+      display: grid;
+      grid-template-columns: 1fr;
+      gap: 12px;
+    }
+    @media (min-width: 900px) {
+      .grid { grid-template-columns: 1fr 1fr; }
+    }
+    label {
+      display: block;
+      font-weight: 600;
+      font-size: 13px;
+      margin-bottom: 6px;
+      color: #cfe0ff;
+    }
+    .hint {
+      font-size: 12px;
+      color: var(--muted);
+      margin-top: 6px;
+    }
+    input {
+      width: 100%;
+      padding: 12px 12px;
+      border-radius: 12px;
+      border: 1px solid var(--border);
+      background: rgba(0,0,0,.25);
+      color: var(--text);
+      outline: none;
+    }
+    input:focus {
+      border-color: rgba(255,255,255,.22);
+      box-shadow: 0 0 0 4px rgba(255,255,255,.06);
+    }
+    .ok { outline: 2px solid rgba(34,197,94,.9) !important; }
+    .bad { outline: 2px solid rgba(239,68,68,.9) !important; }
 
-  // boutons optionnels (si tu en as)
-  btnGenerate: document.getElementById("btnGenerate"),
-  btnCopyAll: document.getElementById("btnCopyAll"),
-  btnOpenAll: document.getElementById("btnOpenAll"),
-};
+    .row {
+      display: flex;
+      gap: 10px;
+      flex-wrap: wrap;
+      margin-top: 12px;
+      align-items: center;
+      justify-content: flex-start;
+    }
+    button {
+      border: 1px solid var(--border);
+      background: var(--btn);
+      color: var(--text);
+      padding: 10px 12px;
+      border-radius: 12px;
+      cursor: pointer;
+      font-weight: 600;
+      font-size: 13px;
+    }
+    button:hover { background: var(--btn2); }
+    button:active { transform: translateY(1px); }
+    .ghost {
+      background: transparent;
+    }
+    .status {
+      margin-left: auto;
+      font-size: 12px;
+      color: var(--muted);
+      display: flex;
+      align-items: center;
+      gap: 8px;
+    }
+    .dot {
+      width: 10px; height: 10px;
+      border-radius: 999px;
+      background: rgba(255,255,255,.22);
+    }
+    .dot.ok { background: rgba(34,197,94,.9); outline: none !important; }
+    .dot.bad { background: rgba(239,68,68,.9); outline: none !important; }
 
-function normalizeBaseUrl(raw) {
-  if (!raw) return "";
-  let u = raw.trim();
-  // enlève trailing slash
-  u = u.replace(/\/+$/, "");
-  return u;
-}
+    .mono { font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, "Liberation Mono", monospace; }
+    .small { font-size: 12px; }
+    .paths {
+      display: grid;
+      grid-template-columns: 1fr;
+      gap: 10px;
+      margin-top: 12px;
+    }
+    @media (min-width: 900px) {
+      .paths { grid-template-columns: 1fr 1fr; }
+    }
+  </style>
+</head>
 
-function isHttpsUrl(value) {
-  try {
-    const u = new URL(value);
-    return u.protocol === "https:";
-  } catch {
-    return false;
-  }
-}
+<body>
+  <div class="wrap">
+    <div class="header card">
+      <div>
+        <h1>Générateur d’URLs pour Discord Developer Portal</h1>
+        <p>
+          Colle ton <span class="mono">Base URL</span> (ton site Netlify ou domaine), puis clique
+          <b>Générer</b>. Les 4 URLs seront construites automatiquement, validées en <span class="mono">https://</span>,
+          et tu peux ensuite <b>Copier tout</b> ou <b>Ouvrir tout</b>.
+        </p>
+      </div>
+      <div class="status" id="status">
+        <span class="dot" id="statusDot"></span>
+        <span id="statusText">Prêt</span>
+      </div>
+    </div>
 
-function setInputValue(input, value) {
-  if (!input) return;
-  input.value = value;
-  // feedback visuel simple
-  input.style.outline = isHttpsUrl(value) ? "2px solid #22c55e" : "2px solid #ef4444";
-}
+    <div class="card">
+      <div class="grid">
+        <div>
+          <label for="baseUrl">Base URL (ton site)</label>
+          <input id="baseUrl" class="mono" placeholder="https://ton-site.netlify.app" autocomplete="off" />
+          <div class="hint">Ex: <span class="mono">https://cs2-update-bot.netlify.app</span> (sans slash à la fin)</div>
+        </div>
 
-function generateUrls() {
-  const base = normalizeBaseUrl(els.baseUrl?.value || "");
-  if (!base) return;
+        <div>
+          <label>Paths (modifiable)</label>
+          <div class="paths">
+            <div>
+              <label class="small" for="pathInteractions">Interactions endpoint</label>
+              <input id="pathInteractions" class="mono" value="/api/interactions" />
+            </div>
+            <div>
+              <label class="small" for="pathVerify">Verify roles URL</label>
+              <input id="pathVerify" class="mono" value="/verify-user" />
+            </div>
+            <div>
+              <label class="small" for="pathTerms">Terms of Service</label>
+              <input id="pathTerms" class="mono" value="/terms-of-service" />
+            </div>
+            <div>
+              <label class="small" for="pathPrivacy">Privacy Policy</label>
+              <input id="pathPrivacy" class="mono" value="/privacy-policy" />
+            </div>
+          </div>
+          <div class="hint">Tu peux adapter ces chemins si tes pages/endpoints s’appellent autrement.</div>
+        </div>
+      </div>
 
-  // ✅ adapte ces paths si tu as des endpoints différents
-  const interactions = `${base}/api/interactions`;
-  const roleVerify = `${base}/verify-user`;
-  const terms = `${base}/terms-of-service`;
-  const privacy = `${base}/privacy-policy`;
+      <div class="row">
+        <button id="btnGenerate">Générer</button>
+        <button id="btnCopyAll">Copier tout</button>
+        <button id="btnOpenAll" class="ghost">Ouvrir tout</button>
+        <button id="btnReset" class="ghost">Reset</button>
+      </div>
+    </div>
 
-  setInputValue(els.interactions, interactions);
-  setInputValue(els.roleVerify, roleVerify);
-  setInputValue(els.terms, terms);
-  setInputValue(els.privacy, privacy);
+    <div class="card">
+      <div class="grid">
+        <div>
+          <label for="interactionsUrl">URL du point de terminaison des interactions</label>
+          <input id="interactionsUrl" class="mono" placeholder="https://..." autocomplete="off" />
+          <div class="hint">À coller dans Discord → “URL du point de terminaison des interactions”.</div>
+        </div>
 
-  saveToLocalStorage();
-}
+        <div>
+          <label for="roleVerifyUrl">URL de vérification des rôles liés</label>
+          <input id="roleVerifyUrl" class="mono" placeholder="https://..." autocomplete="off" />
+          <div class="hint">Optionnel : à coller dans Discord → “URL de vérification des rôles liés”.</div>
+        </div>
 
-async function copyToClipboard(text) {
-  await navigator.clipboard.writeText(text);
-}
+        <div>
+          <label for="termsUrl">URL des Conditions d’Utilisation</label>
+          <input id="termsUrl" class="mono" placeholder="https://..." autocomplete="off" />
+          <div class="hint">Optionnel : à coller dans Discord → “Conditions d’Utilisation”.</div>
+        </div>
 
-async function copyAll() {
-  const lines = [
-    els.interactions?.value,
-    els.roleVerify?.value,
-    els.terms?.value,
-    els.privacy?.value,
-  ].filter(Boolean);
+        <div>
+          <label for="privacyUrl">URL de la Politique de Confidentialité</label>
+          <input id="privacyUrl" class="mono" placeholder="https://..." autocomplete="off" />
+          <div class="hint">Optionnel : à coller dans Discord → “Politique de Confidentialité”.</div>
+        </div>
+      </div>
+    </div>
+  </div>
 
-  if (!lines.length) return;
-  await copyToClipboard(lines.join("\n"));
-}
+  <script>
+    const $ = (id) => document.getElementById(id);
 
-function openAll() {
-  const urls = [
-    els.interactions?.value,
-    els.roleVerify?.value,
-    els.terms?.value,
-    els.privacy?.value,
-  ].filter(Boolean);
+    const els = {
+      baseUrl: $("baseUrl"),
 
-  // ouvre en onglets (peut être bloqué si pas déclenché par un click utilisateur)
-  for (const u of urls) {
-    if (isHttpsUrl(u)) window.open(u, "_blank", "noopener,noreferrer");
-  }
-}
+      pathInteractions: $("pathInteractions"),
+      pathVerify: $("pathVerify"),
+      pathTerms: $("pathTerms"),
+      pathPrivacy: $("pathPrivacy"),
 
-function saveToLocalStorage() {
-  const data = {
-    baseUrl: els.baseUrl?.value || "",
-    interactions: els.interactions?.value || "",
-    roleVerify: els.roleVerify?.value || "",
-    terms: els.terms?.value || "",
-    privacy: els.privacy?.value || "",
-  };
-  localStorage.setItem("discordUrlsConfig", JSON.stringify(data));
-}
+      interactionsUrl: $("interactionsUrl"),
+      roleVerifyUrl: $("roleVerifyUrl"),
+      termsUrl: $("termsUrl"),
+      privacyUrl: $("privacyUrl"),
 
-function loadFromLocalStorage() {
-  const raw = localStorage.getItem("discordUrlsConfig");
-  if (!raw) return;
-  try {
-    const d = JSON.parse(raw);
-    if (els.baseUrl && d.baseUrl) els.baseUrl.value = d.baseUrl;
-    if (els.interactions && d.interactions) els.interactions.value = d.interactions;
-    if (els.roleVerify && d.roleVerify) els.roleVerify.value = d.roleVerify;
-    if (els.terms && d.terms) els.terms.value = d.terms;
-    if (els.privacy && d.privacy) els.privacy.value = d.privacy;
-  } catch {}
-}
+      btnGenerate: $("btnGenerate"),
+      btnCopyAll: $("btnCopyAll"),
+      btnOpenAll: $("btnOpenAll"),
+      btnReset: $("btnReset"),
 
-/**
- * WIRE EVENTS
- */
-function wire() {
-  loadFromLocalStorage();
+      statusDot: $("statusDot"),
+      statusText: $("statusText"),
+    };
 
-  // Génère automatiquement quand tu quittes le champ baseUrl
-  els.baseUrl?.addEventListener("blur", generateUrls);
+    const LS_KEY = "discordUrlsConfig.v1";
 
-  // Sauvegarde auto si tu modifies manuellement une URL
-  [els.baseUrl, els.interactions, els.roleVerify, els.terms, els.privacy]
-    .filter(Boolean)
-    .forEach((el) => el.addEventListener("input", saveToLocalStorage));
+    function setStatus(type, text) {
+      els.statusText.textContent = text;
+      els.statusDot.classList.remove("ok", "bad");
+      if (type === "ok") els.statusDot.classList.add("ok");
+      if (type === "bad") els.statusDot.classList.add("bad");
+    }
 
-  // Boutons optionnels
-  els.btnGenerate?.addEventListener("click", generateUrls);
-  els.btnCopyAll?.addEventListener("click", copyAll);
-  els.btnOpenAll?.addEventListener("click", openAll);
-}
+    function normalizeBaseUrl(raw) {
+      if (!raw) return "";
+      return raw.trim().replace(/\/+$/, "");
+    }
 
-document.addEventListener("DOMContentLoaded", wire);
-</script>
+    function normalizePath(raw) {
+      if (!raw) return "/";
+      let p = raw.trim();
+      if (!p.startsWith("/")) p = "/" + p;
+      // évite double slash interne
+      p = p.replace(/\/{2,}/g, "/");
+      return p;
+    }
+
+    function isHttpsUrl(value) {
+      try {
+        const u = new URL(value);
+        return u.protocol === "https:";
+      } catch {
+        return false;
+      }
+    }
+
+    function markValidity(input) {
+      input.classList.remove("ok", "bad");
+      if (!input.value) return;
+      input.classList.add(isHttpsUrl(input.value) ? "ok" : "bad");
+    }
+
+    function save() {
+      const data = {
+        baseUrl: els.baseUrl.value || "",
+        paths: {
+          interactions: els.pathInteractions.value || "",
+          verify: els.pathVerify.value || "",
+          terms: els.pathTerms.value || "",
+          privacy: els.pathPrivacy.value || "",
+        },
+        urls: {
+          interactions: els.interactionsUrl.value || "",
+          verify: els.roleVerifyUrl.value || "",
+          terms: els.termsUrl.value || "",
+          privacy: els.privacyUrl.value || "",
+        }
+      };
+      localStorage.setItem(LS_KEY, JSON.stringify(data));
+    }
+
+    function load() {
+      const raw = localStorage.getItem(LS_KEY);
+      if (!raw) return;
+      try {
+        const d = JSON.parse(raw);
+        if (d.baseUrl) els.baseUrl.value = d.baseUrl;
+
+        if (d.paths?.interactions) els.pathInteractions.value = d.paths.interactions;
+        if (d.paths?.verify) els.pathVerify.value = d.paths.verify;
+        if (d.paths?.terms) els.pathTerms.value = d.paths.terms;
+        if (d.paths?.privacy) els.pathPrivacy.value = d.paths.privacy;
+
+        if (d.urls?.interactions) els.interactionsUrl.value = d.urls.interactions;
+        if (d.urls?.verify) els.roleVerifyUrl.value = d.urls.verify;
+        if (d.urls?.terms) els.termsUrl.value = d.urls.terms;
+        if (d.urls?.privacy) els.privacyUrl.value = d.urls.privacy;
+
+        [els.interactionsUrl, els.roleVerifyUrl, els.termsUrl, els.privacyUrl].forEach(markValidity);
+        setStatus("ok", "Config chargée");
+      } catch {}
+    }
+
+    function resetAll() {
+      localStorage.removeItem(LS_KEY);
+      els.baseUrl.value = "";
+      els.interactionsUrl.value = "";
+      els.roleVerifyUrl.value = "";
+      els.termsUrl.value = "";
+      els.privacyUrl.value = "";
+      [els.interactionsUrl, els.roleVerifyUrl, els.termsUrl, els.privacyUrl].forEach((i) => {
+        i.classList.remove("ok", "bad");
+      });
+      setStatus(null, "Reset");
+    }
+
+    function generate() {
+      const base = normalizeBaseUrl(els.baseUrl.value);
+      if (!base) {
+        setStatus("bad", "Base URL manquante");
+        return;
+      }
+      if (!isHttpsUrl(base)) {
+        setStatus("bad", "Base URL doit être en https://");
+        return;
+      }
+
+      const pInteractions = normalizePath(els.pathInteractions.value);
+      const pVerify = normalizePath(els.pathVerify.value);
+      const pTerms = normalizePath(els.pathTerms.value);
+      const pPrivacy = normalizePath(els.pathPrivacy.value);
+
+      els.interactionsUrl.value = base + pInteractions;
+      els.roleVerifyUrl.value = base + pVerify;
+      els.termsUrl.value = base + pTerms;
+      els.privacyUrl.value = base + pPrivacy;
+
+      [els.interactionsUrl, els.roleVerifyUrl, els.termsUrl, els.privacyUrl].forEach(markValidity);
+
+      save();
+      setStatus("ok", "URLs générées");
+    }
+
+    async function copyAll() {
+      const lines = [
+        els.interactionsUrl.value,
+        els.roleVerifyUrl.value,
+        els.termsUrl.value,
+        els.privacyUrl.value,
+      ].filter(Boolean);
+
+      if (!lines.length) {
+        setStatus("bad", "Rien à copier");
+        return;
+      }
+
+      try {
+        await navigator.clipboard.writeText(lines.join("\n"));
+        setStatus("ok", "Copié dans le presse-papiers");
+      } catch {
+        setStatus("bad", "Copie impossible (permissions navigateur)");
+      }
+    }
+
+    function openAll() {
+      const urls = [
+        els.interactionsUrl.value,
+        els.roleVerifyUrl.value,
+        els.termsUrl.value,
+        els.privacyUrl.value,
+      ].filter(Boolean);
+
+      const valid = urls.filter(isHttpsUrl);
+      if (!valid.length) {
+        setStatus("bad", "Aucune URL https valide à ouvrir");
+        return;
+      }
+
+      // Important : les navigateurs peuvent bloquer si pas déclenché par clic utilisateur
+      for (const u of valid) window.open(u, "_blank", "noopener,noreferrer");
+
+      setStatus("ok", `Ouvert ${valid.length} URL(s)`);
+    }
+
+    function wire() {
+      load();
+
+      // Générer sur bouton + blur baseUrl
+      els.btnGenerate.addEventListener("click", generate);
+      els.baseUrl.addEventListener("blur", generate);
+
+      // actions
+      els.btnCopyAll.addEventListener("click", copyAll);
+      els.btnOpenAll.addEventListener("click", openAll);
+      els.btnReset.addEventListener("click", resetAll);
+
+      // autosave
+      [
+        els.baseUrl,
+        els.pathInteractions,
+        els.pathVerify,
+        els.pathTerms,
+        els.pathPrivacy,
+        els.interactionsUrl,
+        els.roleVerifyUrl,
+        els.termsUrl,
+        els.privacyUrl,
+      ].forEach((el) => el.addEventListener("input", save));
+
+      // re-validate
+      [els.interactionsUrl, els.roleVerifyUrl, els.termsUrl, els.privacyUrl].forEach((el) => {
+        el.addEventListener("input", () => markValidity(el));
+      });
+
+      setStatus(null, "Prêt");
+    }
+
+    document.addEventListener("DOMContentLoaded", wire);
+  </script>
+</body>
+</html>
