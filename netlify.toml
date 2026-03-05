@@ -1,0 +1,17 @@
+[build]
+  publish = "."
+
+[functions]
+  directory = "netlify/functions"
+  node_bundler = "esbuild"
+
+# (optionnel) Force Node 20 si besoin
+[build.environment]
+  NODE_VERSION = "20"
+
+# (optionnel) URL propre pour ton endpoint interactions
+[[redirects]]
+  from = "/api/interactions"
+  to = "/.netlify/functions/interactions"
+  status = 200
+  force = true

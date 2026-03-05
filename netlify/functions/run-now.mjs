@@ -39,7 +39,7 @@ export default async () => {
   const store = getStore("cs2-update");
 
   const latest = await fetchLatestSteamNews(appId);
-  if (!latest?.gid) return { statusCode: 200, body: "no news" };
+  if (!latest?.gid) return new Response("ok", { status: 200 });
 
   // Force post even if same gid? -> tu choisis :
   // const lastGid = await store.get("lastGid");

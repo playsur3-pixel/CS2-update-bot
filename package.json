@@ -1,6 +1,8 @@
 {
+  "name": "cs2-update-bot-netlify",
+  "private": true,
+  "type": "module",
   "dependencies": {
-    "@netlify/blobs": "^10.7.0",
-    "tweetnacl": "^1.0.3"
+    "@netlify/blobs": "^10.0.0"
   }
 }
