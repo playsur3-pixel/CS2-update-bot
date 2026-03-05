@@ -24,14 +24,64 @@ async function fetchLatestSteamNews(appId) {
   return items[0] ?? null;
 }
 
-function htmlToPlainText(html) {
-  return (html ?? "")
-    .replace(/<br\s*\/?>/gi, "\n")
-    .replace(/<\/p>/gi, "\n\n")
-    .replace(/<[^>]*>/g, "")
+function decodeEntities(s) {
+  return (s ?? "")
+    .replace(/&amp;/g, "&")
+    .replace(/&lt;/g, "<")
+    .replace(/&gt;/g, ">")
+    .replace(/&quot;/g, '"')
+    .replace(/&#39;/g, "'");
+}
+
+function steamBbcodeToDiscord(input) {
+  let s = decodeEntities(input ?? "");
+
+  // Liens [url="..."]text[/url]  ->  text (url)
+  s = s.replace(/\[url="([^"]+)"\]([\s\S]*?)\[\/url\]/gi, (_, url, text) => {
+    const t = String(text).trim() || url;
+    return `${t} (${url})`;
+  });
+
+  // Nettoyage des tags Steam BBCode
+  // [p] -> newline, [/p] -> newline
+  s = s.replace(/\[\/?p\]/gi, "\n");
+
+  // [list] ... [/list] -> garde contenu, mais avec newlines
+  s = s.replace(/\[list\]/gi, "\n").replace(/\[\/list\]/gi, "\n");
+
+  // Puces : [*] et [] (Steam met parfois [])
+  s = s.replace(/\[\*\]/g, "\n- ");
+  s = s.replace(/\[\]\s*/g, "\n- ");
+  s = s.replace(/\[\/\]/g, ""); // fermeture vide Steam
+
+  // Titres style [ MISC ] : on les met en header
+  s = s.replace(/\[\s*([A-Z0-9 \-_/]+)\s*\]/g, (m, title) => {
+    const t = String(title).trim();
+    // évite de transformer les tags qui ne sont pas des headers
+    if (!t || t.length > 40) return m;
+    return `\n\n__**${t}**__\n`;
+  });
+
+  // Retire le reste des tags inconnus [xxx]
+  s = s.replace(/\[[^\]]+\]/g, "");
+
+  // Nettoyage des espaces / lignes
+  s = s
+    .replace(/\r/g, "")
     .replace(/[ \t]+\n/g, "\n")
     .replace(/\n{3,}/g, "\n\n")
     .trim();
+
+  // Ajoute des icônes aux sections connues (optionnel)
+  s = s
+    .replace(/__\*\*MISC\*\*__/g, "__**🧩 MISC**__")
+    .replace(/__\*\*MAPS\*\*__/g, "__**🗺️ MAPS**__")
+    .replace(/__\*\*MAP SCRIPTING\*\*__/g, "__**🧠 MAP SCRIPTING**__")
+    .replace(/__\*\*WORKSHOP\*\*__/g, "__**🛠️ WORKSHOP**__")
+    .replace(/__\*\*UI\*\*__/g, "__**🧭 UI**__");
+
+  // Petite retouche : lignes qui ne commencent pas par "-" sous une section -> on les laisse
+  return s;
 }
 
 async function postWebhook(webhookUrl, content) {
@@ -78,7 +128,7 @@ export default async () => {
 
     const title = latest.title ?? "Counter-Strike 2 Update";
     const url = latest.url ?? "";
-    const body = htmlToPlainText(latest.contents ?? "");
+    const body = steamBbcodeToDiscord(latest.contents ?? "");
     const full = `**${title}**\n${url}\n\n${body}`;
 
     const parts = chunk(full, 1900);
