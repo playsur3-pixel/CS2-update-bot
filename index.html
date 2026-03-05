@@ -1,0 +1,167 @@
+<!doctype html>
+<html lang="fr">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Discord Bot – URLs Netlify</title>
+    <style>
+      :root { color-scheme: dark; }
+      body {
+        margin: 0;
+        font-family: ui-sans-serif, system-ui, -apple-system, Segoe UI, Roboto, Arial;
+        background: #0b0f17;
+        color: #e6edf3;
+      }
+      .wrap { max-width: 900px; margin: 0 auto; padding: 28px 18px; }
+      .card {
+        background: #0f172a;
+        border: 1px solid #1f2a44;
+        border-radius: 14px;
+        padding: 18px;
+        box-shadow: 0 10px 35px rgba(0,0,0,.35);
+        margin-bottom: 14px;
+      }
+      h1 { font-size: 22px; margin: 0 0 6px; }
+      p { margin: 8px 0; color: #b8c4d6; line-height: 1.45; }
+      .row { display: grid; grid-template-columns: 240px 1fr; gap: 12px; align-items: center; padding: 10px 0; border-top: 1px dashed #22304f; }
+      .row:first-of-type { border-top: none; }
+      .label { font-weight: 600; color: #dbe7ff; }
+      .field {
+        display: grid;
+        grid-template-columns: 1fr auto;
+        gap: 10px;
+        align-items: center;
+      }
+      input {
+        width: 100%;
+        padding: 10px 12px;
+        border-radius: 10px;
+        border: 1px solid #263354;
+        background: #0b1220;
+        color: #e6edf3;
+        outline: none;
+        font-size: 13px;
+      }
+      button {
+        padding: 10px 12px;
+        border-radius: 10px;
+        border: 1px solid #2c3a61;
+        background: #111a2f;
+        color: #e6edf3;
+        cursor: pointer;
+        font-weight: 600;
+      }
+      button:hover { background: #152040; }
+      .hint { font-size: 12px; color: #9fb1cc; margin-top: 6px; }
+      .ok { color: #6ee7b7; font-weight: 700; }
+      .warn { color: #fbbf24; font-weight: 700; }
+      code { background: #0b1220; padding: 2px 6px; border-radius: 6px; border: 1px solid #263354; }
+      .footer { font-size: 12px; color: #8aa0c2; margin-top: 14px; }
+      a { color: #9cc2ff; }
+    </style>
+  </head>
+  <body>
+    <div class="wrap">
+      <div class="card">
+        <h1>Discord Bot – URLs Netlify</h1>
+        <p>
+          Cette page te donne les URLs à coller dans le <b>Discord Developer Portal</b> (écran comme sur ton screenshot).
+          <br />
+          Ton domaine détecté : <code id="origin">...</code>
+        </p>
+        <p class="hint">
+          ⚠️ <span class="warn">Interactions endpoint</span> : utile seulement si tu choisis l’option “POST HTTP” au lieu du Gateway.
+          Si tu utilises un bot “classique”, tu peux laisser vide.
+        </p>
+      </div>
+
+      <div class="card" id="urls">
+        <div class="row">
+          <div class="label">URL interactions (POST)</div>
+          <div class="field">
+            <input id="interactions" readonly />
+            <button data-copy="interactions">Copier</button>
+          </div>
+        </div>
+
+        <div class="row">
+          <div class="label">URL vérif rôles</div>
+          <div class="field">
+            <input id="verify" readonly />
+            <button data-copy="verify">Copier</button>
+          </div>
+        </div>
+
+        <div class="row">
+          <div class="label">URL Conditions</div>
+          <div class="field">
+            <input id="terms" readonly />
+            <button data-copy="terms">Copier</button>
+          </div>
+        </div>
+
+        <div class="row">
+          <div class="label">URL Confidentialité</div>
+          <div class="field">
+            <input id="privacy" readonly />
+            <button data-copy="privacy">Copier</button>
+          </div>
+        </div>
+
+        <p class="hint">
+          Les pages <code>/terms</code> et <code>/privacy</code> n’existent pas encore dans ce mini-projet.
+          Si tu veux, je te génère aussi <b>terms.html</b> et <b>privacy.html</b> (propres et simples).
+        </p>
+
+        <div class="footer">
+          Tip : après déploiement, tu pourras venir ici et copier-coller direct.
+          <br />
+          Si tu utilises des Netlify Functions plus tard, on pourra pointer <code>/api/interactions</code> vers une function.
+          <span id="copyStatus"></span>
+        </div>
+      </div>
+    </div>
+
+    <script>
+      const origin = window.location.origin;
+      document.getElementById("origin").textContent = origin;
+
+      // Routes proposées (tu peux changer si besoin)
+      const routes = {
+        interactions: "/api/interactions",
+        verify: "/verify-user",
+        terms: "/terms",
+        privacy: "/privacy",
+      };
+
+      document.getElementById("interactions").value = origin + routes.interactions;
+      document.getElementById("verify").value = origin + routes.verify;
+      document.getElementById("terms").value = origin + routes.terms;
+      document.getElementById("privacy").value = origin + routes.privacy;
+
+      async function copyFrom(id) {
+        const el = document.getElementById(id);
+        try {
+          await navigator.clipboard.writeText(el.value);
+          showStatus(" ✅ Copié !", true);
+        } catch {
+          // fallback
+          el.select();
+          document.execCommand("copy");
+          showStatus(" ✅ Copié !", true);
+        }
+      }
+
+      function showStatus(text, ok) {
+        const s = document.getElementById("copyStatus");
+        s.textContent = text;
+        s.className = ok ? "ok" : "";
+        setTimeout(() => (s.textContent = ""), 1200);
+      }
+
+      document.querySelectorAll("button[data-copy]").forEach((btn) => {
+        btn.addEventListener("click", () => copyFrom(btn.dataset.copy));
+      });
+    </script>
+  </body>
+</html>
