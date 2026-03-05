@@ -10,20 +10,6 @@ function chunk(str, size = 1900) {
   return out;
 }
 
-async function fetchLatestSteamNews(appId) {
-  const url = `https://api.steampowered.com/ISteamNews/GetNewsForApp/v2/?appid=${encodeURIComponent(
-    appId
-  )}&count=5&maxlength=0`;
-
-  const res = await fetch(url, { headers: { "User-Agent": "cs2-netlify/1.0" } });
-  if (!res.ok) throw new Error(`Steam HTTP ${res.status}`);
-
-  const data = await res.json();
-  const items = data?.appnews?.newsitems ?? [];
-  items.sort((a, b) => (b.date ?? 0) - (a.date ?? 0));
-  return items[0] ?? null;
-}
-
 function decodeEntities(s) {
   return (s ?? "")
     .replace(/&amp;/g, "&")
@@ -36,64 +22,100 @@ function decodeEntities(s) {
 function steamBbcodeToDiscord(input) {
   let s = decodeEntities(input ?? "");
 
-  // Liens [url="..."]text[/url]  ->  text (url)
+  // [url="..."]text[/url] -> text (url)
   s = s.replace(/\[url="([^"]+)"\]([\s\S]*?)\[\/url\]/gi, (_, url, text) => {
     const t = String(text).trim() || url;
     return `${t} (${url})`;
   });
 
-  // Nettoyage des tags Steam BBCode
-  // [p] -> newline, [/p] -> newline
+  // Paragraphs
   s = s.replace(/\[\/?p\]/gi, "\n");
 
-  // [list] ... [/list] -> garde contenu, mais avec newlines
+  // Lists
   s = s.replace(/\[list\]/gi, "\n").replace(/\[\/list\]/gi, "\n");
 
-  // Puces : [*] et [] (Steam met parfois [])
+  // Bullets: Steam often uses [] ... [/]
   s = s.replace(/\[\*\]/g, "\n- ");
   s = s.replace(/\[\]\s*/g, "\n- ");
-  s = s.replace(/\[\/\]/g, ""); // fermeture vide Steam
+  s = s.replace(/\[\/\]/g, "");
 
-  // Titres style [ MISC ] : on les met en header
+  // Section headers: [ MISC ] etc.
   s = s.replace(/\[\s*([A-Z0-9 \-_/]+)\s*\]/g, (m, title) => {
     const t = String(title).trim();
-    // évite de transformer les tags qui ne sont pas des headers
     if (!t || t.length > 40) return m;
     return `\n\n__**${t}**__\n`;
   });
 
-  // Retire le reste des tags inconnus [xxx]
+  // Remove remaining tags [xxx]
   s = s.replace(/\[[^\]]+\]/g, "");
 
-  // Nettoyage des espaces / lignes
+  // Cleanup
   s = s
     .replace(/\r/g, "")
     .replace(/[ \t]+\n/g, "\n")
     .replace(/\n{3,}/g, "\n\n")
     .trim();
 
-  // Ajoute des icônes aux sections connues (optionnel)
+  // Icons for known sections
   s = s
     .replace(/__\*\*MISC\*\*__/g, "__**🧩 MISC**__")
     .replace(/__\*\*MAPS\*\*__/g, "__**🗺️ MAPS**__")
     .replace(/__\*\*MAP SCRIPTING\*\*__/g, "__**🧠 MAP SCRIPTING**__")
-    .replace(/__\*\*WORKSHOP\*\*__/g, "__**🛠️ WORKSHOP**__")
-    .replace(/__\*\*UI\*\*__/g, "__**🧭 UI**__");
+    .replace(/__\*\*UI\*\*__/g, "__**🧭 UI**__")
+    .replace(/__\*\*WORKSHOP\*\*__/g, "__**🛠️ WORKSHOP**__");
 
-  // Petite retouche : lignes qui ne commencent pas par "-" sous une section -> on les laisse
   return s;
 }
 
-async function postWebhook(webhookUrl, content) {
+function boldMapNames(text) {
+  const lines = String(text ?? "").split("\n");
+  return lines
+    .map((line) => {
+      const t = line.trim();
+      if (
+        t &&
+        !t.startsWith("-") &&
+        !t.startsWith("__**") &&
+        t.length <= 28 &&
+        /^[A-Za-z0-9 '’:-]+$/.test(t)
+      ) {
+        return `**${t}**`;
+      }
+      return line;
+    })
+    .join("\n");
+}
+
+async function fetchLatestSteamNews(appId) {
+  const url =
+    `https://api.steampowered.com/ISteamNews/GetNewsForApp/v2/` +
+    `?appid=${encodeURIComponent(appId)}&count=5&maxlength=0`;
+
+  const res = await fetch(url, { headers: { "User-Agent": "cs2-netlify/1.0" } });
+  if (!res.ok) throw new Error(`Steam HTTP ${res.status}`);
+
+  const data = await res.json();
+  const items = data?.appnews?.newsitems ?? [];
+  items.sort((a, b) => (b.date ?? 0) - (a.date ?? 0));
+  return items[0] ?? null;
+}
+
+async function postWebhook(webhookUrl, content, roleId = "") {
+  const payload = {
+    content,
+    // n'autorise que la mention du rôle voulu
+    allowed_mentions: roleId ? { roles: [roleId] } : { parse: [] },
+  };
+
   const res = await fetch(webhookUrl, {
     method: "POST",
     headers: { "Content-Type": "application/json" },
-    body: JSON.stringify({ content }),
+    body: JSON.stringify(payload),
   });
 
   if (!res.ok) {
-    const text = await res.text().catch(() => "");
-    throw new Error(`Discord webhook HTTP ${res.status} ${text ? `- ${text}` : ""}`);
+    const txt = await res.text().catch(() => "");
+    throw new Error(`Discord webhook HTTP ${res.status}${txt ? ` - ${txt}` : ""}`);
   }
 }
 
@@ -101,14 +123,17 @@ export default async () => {
   try {
     const appId = process.env.APP_ID ?? "730";
 
-    const urlsRaw = process.env.DISCORD_WEBHOOK_URLS ?? "";
-    const webhookUrls = urlsRaw
+    const webhookUrls = (process.env.DISCORD_WEBHOOK_URLS ?? "")
       .split(",")
       .map((s) => s.trim())
       .filter(Boolean);
 
-    if (webhookUrls.length === 0) {
-      console.error("Missing DISCORD_WEBHOOK_URLS env var");
+    const roleIds = (process.env.ROLE_CS2_IDS ?? "")
+      .split(",")
+      .map((s) => s.trim()); // peut être plus court, on gère
+
+    if (!webhookUrls.length) {
+      console.error("Missing DISCORD_WEBHOOK_URLS");
       return;
     }
 
@@ -127,22 +152,25 @@ export default async () => {
     }
 
     const title = latest.title ?? "Counter-Strike 2 Update";
-    const url = latest.url ?? "";
-    const body = steamBbcodeToDiscord(latest.contents ?? "");
-    const full = `**${title}**\n${url}\n\n${body}`;
+    const srcUrl = latest.url ?? "";
+    let body = steamBbcodeToDiscord(latest.contents ?? "");
+    body = boldMapNames(body);
+
+    const header = `**${title}**\n${srcUrl}\n\n`;
+    const full = header + (body || "_(contenu vide)_");
 
     const parts = chunk(full, 1900);
 
-    // Poste sur chaque webhook (si un webhook échoue, on log et on continue)
-    for (const wh of webhookUrls) {
+    // Envoi sur chaque webhook avec le rôle correspondant (même index)
+    for (let w = 0; w < webhookUrls.length; w++) {
+      const wh = webhookUrls[w];
+      const roleId = roleIds[w] || "";
+
       for (let i = 0; i < parts.length; i++) {
+        // Mention uniquement sur la 1ère partie
+        const mention = i === 0 && roleId ? `<@&${roleId}>\n` : "";
         const prefix = parts.length > 1 ? `*(part ${i + 1}/${parts.length})*\n` : "";
-        try {
-          await postWebhook(wh, prefix + parts[i]);
-        } catch (e) {
-          console.error("Webhook post failed:", e?.message ?? e);
-          break; // on évite d’envoyer 20 morceaux sur un webhook qui bloque
-        }
+        await postWebhook(wh, mention + prefix + parts[i], roleId);
       }
     }
 
@@ -150,7 +178,6 @@ export default async () => {
     console.log("Posted new gid:", latest.gid);
     return;
   } catch (e) {
-    // Important : ne pas laisser crasher la scheduled function
     console.error("Scheduled function error:", e?.stack ?? e);
     return;
   }
